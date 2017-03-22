@@ -1,0 +1,102 @@
+---
+title: "Peer Assessment 2 - NOAA Storm Database"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Title
+Identification of storm events in the United States types that are the most harmful to the population's health and have the greates economic consequences. 
+
+# Synopsis
+This analysis considers data from the National Weather Service - NOAA Storm Data Archive for the years 1950 - 2011 for the purpose of answering 2 questions: 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? and 2. Across the United States, which types of events have the greatest economic consequences?
+
+# Data Processing
+### Load necessary libraries
+```{r echo=FALSE}
+require(dplyr)
+require(lubridate)
+```
+### Download and read the storm data into a data.frame
+```{r cache=TRUE}
+if(!file.exists("StormData.csv.bz2")){
+        download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
+        }
+dfNOAA <- read.csv("StormData.csv.bz2", header=TRUE)
+```
+### Summarize Fatality and Injury totals by Year and Event Type
+```{r}
+dfEvent <- dfNOAA %>% select(BGN_DATE, EVTYPE, FATALITIES, INJURIES) %>% 
+        mutate(YEAR = year(as.Date(BGN_DATE, format="%m/%d/%Y %H:%M:%S"))) %>% 
+        group_by(YEAR, EVTYPE) %>% summarize(sum(FATALITIES), sum(INJURIES))
+names(dfEvent)<- c("YEAR", "EVTYPE", "Total_FATALITIES", 'Total_INJURIES')
+```    
+### Summarize the number of Event Type classifications by Year
+```{r}
+dfEventTypeCount <- data.frame(YEAR=unique(dfEvent$YEAR), NUM_EVTYPE = group_size(dfEvent))
+```  
+
+### Select the event type with the most fatalities for a specific year
+```{r}
+dfMaxFatalities <- dfEvent %>% group_by(YEAR) %>% filter(Total_FATALITIES == max(Total_FATALITIES)) %>% arrange(desc(YEAR),EVTYPE,Total_FATALITIES)
+```     
+### Select the event type with the most injurines for a specific year
+```{r}
+dfMaxInjuries <- dfEvent %>% group_by(YEAR) %>% filter(Total_INJURIES == max(Total_INJURIES)) %>% arrange(desc(YEAR),EVTYPE,Total_INJURIES)
+```
+### The value of property damage are represented in the data is maintained in two fields  PROPDMG and PROPDMGEXP.  PROPDMGEXP is the exponent to be applied to the PROPDMG value.  
+The expected values for the exponent are:  
+1. b, B = Billions  
+2. m, M = Millions  
+3. k, K = Thousands  
+4. h, H = Hundreds  
+However, there are additional values in the data:
+```{r}
+unique(dfNOAA$PROPDMGEXP)
+```
+For PROPDMGEXP values of ? - +: 0 was used as the exponent.  In most cases, the PROPDMG value is 0, only in the 5 cases where the exponent is + are there no zero data in PROPDMG.
+
+Show data above: dfEventDamage[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '') & dfEventDamage$Total_PropertyDamage >0, ]
+
+For PROPDMGEXP values of 0 - 8: the numeric value was used as the exponent, e.g. 10^PROPDMGEXP
+```{r}
+dfEventDamage <- dfNOAA %>% select(BGN_DATE, EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP) %>% 
+        mutate(YEAR = year(as.Date(BGN_DATE, format="%m/%d/%Y %H:%M:%S")), Total_PropertyDamage = 0)
+
+#dfEventDamage %>% filter(PROPDMGEXP %in% c('+', '?', '-', '')) %>% mutate(Total_PropertyDamage = PROPDMG)
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '', '0'), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '', '0')]
+
+
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(1:9), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% as.character(1:9)] * 10 ^ as.integer(as.character(dfEventDamage$PROPDMGEXP[dfEventDamage$PROPDMGEXP %in% as.character(1:9)]))
+
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(1:9) & dfEventDamage$Total_PropertyDamage > 0, ]
+
+
+#dfEventDamage %>% filter(PROPDMGEXP %in% as.character(0:9)) %>% mutate(Total_PropertyDamage = PROPDMG * 10^(as.integer(PROPDMGEXP)))
+
+nrow(dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(0:9) , ])
+nrow(dfEventDamage)
+
+tail(dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(0:9) , ], 20)
+
+# Need to do  the letters
+```
+
+# Data Exploration
+### The Number of Event type classifications have changed significantly over the years
+#### Summary of event type count by year:
+
+* For the years 1950 - 1954, there is only 1 event type - Tornados
+* For the years 1955 - 1992, there are 3 event types
+* For the years 1993 - 2002, there are between 99 and 387 event types
+* For the years 2003 - 2011, there are between 38 and 51 event types  
+
+Given the change in event classificaitons, it will be difficult to compare data across these 4 periods.  For example, to more accurately compare across the last two periods of year listed above, some additional mapping of event types is necessary because the level of granularity in the classification for years 1993 - 2002 is much higher than for 2003 - 2011.  For the purpose of this initial analysis, this mapping is NOT present.
+
+```{r}
+dfEventTypeCount
+```
+
+# Results
