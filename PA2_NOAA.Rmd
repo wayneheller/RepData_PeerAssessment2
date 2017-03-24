@@ -18,6 +18,7 @@ This analysis considers data from the National Weather Service - NOAA Storm Data
 ```{r echo=FALSE}
 require(dplyr)
 require(lubridate)
+require(knitr)
 ```
 ### Download and read the storm data into a data.frame
 ```{r cache=TRUE}
@@ -42,11 +43,11 @@ dfEventTypeCount <- data.frame(YEAR=unique(dfEvent$YEAR), NUM_EVTYPE = group_siz
 ```{r}
 dfMaxFatalities <- dfEvent %>% group_by(YEAR) %>% filter(Total_FATALITIES == max(Total_FATALITIES)) %>% arrange(desc(YEAR),EVTYPE,Total_FATALITIES)
 ```     
-### Select the event type with the most injurines for a specific year
+### Select the event type with the most injuries for a specific year
 ```{r}
 dfMaxInjuries <- dfEvent %>% group_by(YEAR) %>% filter(Total_INJURIES == max(Total_INJURIES)) %>% arrange(desc(YEAR),EVTYPE,Total_INJURIES)
 ```
-### The value of property damage are represented in the data is maintained in two fields  PROPDMG and PROPDMGEXP.  PROPDMGEXP is the exponent to be applied to the PROPDMG value.  
+### The value of property damage are represented in the data is maintained in two fields  PROPDMG and PROPDMGEXP.  PROPDMGEXP is the exponent to be applied to the PROPDMG value. 
 The expected values for the exponent are:  
 1. b, B = Billions  
 2. m, M = Millions  
@@ -56,32 +57,76 @@ However, there are additional values in the data:
 ```{r}
 unique(dfNOAA$PROPDMGEXP)
 ```
-For PROPDMGEXP values of ? - +: 0 was used as the exponent.  In most cases, the PROPDMG value is 0, only in the 5 cases where the exponent is + are there no zero data in PROPDMG.
+5. ?, -, +, {space} = 0 was used as the exponent.  In most cases, the PROPDMG value is 0, only in the 5 cases where the exponent is + are there no zero data in PROPDMG.
 
-Show data above: dfEventDamage[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '') & dfEventDamage$Total_PropertyDamage >0, ]
-
-For PROPDMGEXP values of 0 - 8: the numeric value was used as the exponent, e.g. 10^PROPDMGEXP
+6. 0 - 8: the numeric value was used as the exponent, e.g. 10^PROPDMGEXP
 ```{r}
 dfEventDamage <- dfNOAA %>% select(BGN_DATE, EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP) %>% 
-        mutate(YEAR = year(as.Date(BGN_DATE, format="%m/%d/%Y %H:%M:%S")), Total_PropertyDamage = 0)
+        mutate(YEAR = year(as.Date(BGN_DATE, format="%m/%d/%Y %H:%M:%S")), Total_PropertyDamage = 0, Total_CropDamage = 0)
 
-#dfEventDamage %>% filter(PROPDMGEXP %in% c('+', '?', '-', '')) %>% mutate(Total_PropertyDamage = PROPDMG)
 dfEventDamage[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '', '0'), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('+', '?', '-', '', '0')]
 
 
 dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(1:9), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% as.character(1:9)] * 10 ^ as.integer(as.character(dfEventDamage$PROPDMGEXP[dfEventDamage$PROPDMGEXP %in% as.character(1:9)]))
 
-dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(1:9) & dfEventDamage$Total_PropertyDamage > 0, ]
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("B", "b"), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('B', 'b')] * 10 ^ 9
+
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("M", "m"), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('M', 'm')] * 10 ^ 6
+
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("K", "k"), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('K', 'k')] * 10 ^ 3
+
+dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("H", "h"), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('H', 'h')] * 10 ^ 2
+
+```
+### The value of crop damage are represented in the data is maintained in two fields  CROPDMG and CROPDMGEXP.  CROPDMGEXP is the exponent to be applied to the CROPDMG value. 
+The expected values for the exponent are:  
+1. b, B = Billions  
+2. m, M = Millions  
+3. k, K = Thousands  
+4. h, H = Hundreds  
+However, there are additional values in the data:
+```{r}
+unique(dfNOAA$CROPDMGEXP)
+```
+5. ?, -, +, {space} = 0 was used as the exponent.  
+
+6. 0 - 8: the numeric value was used as the exponent, e.g. 10^PROPDMGEXP
+```{r}
+
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% c('+', '?', '-', '', '0'), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% c('+', '?', '-', '', '0')]
 
 
-#dfEventDamage %>% filter(PROPDMGEXP %in% as.character(0:9)) %>% mutate(Total_PropertyDamage = PROPDMG * 10^(as.integer(PROPDMGEXP)))
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% as.character(1:9), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% as.character(1:9)] * 10 ^ as.integer(as.character(dfEventDamage$CROPDMGEXP[dfEventDamage$CROPDMGEXP %in% as.character(1:9)]))
 
-nrow(dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(0:9) , ])
-nrow(dfEventDamage)
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% c("B", "b"), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% c('B', 'b')] * 10 ^ 9
 
-tail(dfEventDamage[dfEventDamage$PROPDMGEXP %in% as.character(0:9) , ], 20)
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% c("M", "m"), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% c('M', 'm')] * 10 ^ 6
 
-# Need to do  the letters
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% c("K", "k"), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% c('K', 'k')] * 10 ^ 3
+
+dfEventDamage[dfEventDamage$CROPDMGEXP %in% c("H", "h"), 9] <-    dfEventDamage$CROPDMG[dfEventDamage$CROPDMGEXP %in% c('H', 'h')] * 10 ^ 2
+
+
+```
+### Summarize Damage totals by year and event type
+```{r}
+dfEventDamage <- dfEventDamage %>% select(YEAR, EVTYPE, Total_PropertyDamage, Total_CropDamage) %>% group_by(YEAR, EVTYPE) %>% summarize(sum(Total_PropertyDamage), sum(Total_CropDamage))
+
+names(dfEventDamage)<- c("YEAR", "EVTYPE", "Total_PropertyDamage", 'Total_CropDamage')
+```
+### Select the event type with the most property damage for a specific year
+```{r}
+dfMaxPropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_PropertyDamage== max(Total_PropertyDamage)) %>% arrange(desc(YEAR),EVTYPE,Total_PropertyDamage)
+
+kable(dfMaxPropDamage[, c(1, 2, 3)], digits=2)
+```
+
+### Select the event type with the most Crop damage for a specific year
+```{r}
+dfMaxCropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_CropDamage== max(Total_CropDamage)) %>% arrange(desc(YEAR),EVTYPE,Total_CropDamage)
+
+kable(dfMaxCropDamage[, c(1, 2, 4)], digits = 2)
+
 ```
 
 # Data Exploration
