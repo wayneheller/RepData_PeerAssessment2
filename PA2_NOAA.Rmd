@@ -8,10 +8,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Title
-Identification of storm events in the United States types that are the most harmful to the population's health and have the greates economic consequences. 
+Identification of storm events in the United States that are the most harmful to the population's health and have the greatest economic impact. 
 
 # Synopsis
-This analysis considers data from the National Weather Service - NOAA Storm Data Archive for the years 1950 - 2011 for the purpose of answering 2 questions: 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? and 2. Across the United States, which types of events have the greatest economic consequences?
+This analysis considers data from the National Weather Service - NOAA Storm Data Archive for the years 1950 - 2011 for the purpose of answering 2 questions:  
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? and  
+2. Across the United States, which types of events have the greatest economic consequences?  
+Based on the analysis below:  
+*TORNADOS* AND *EXCESSIVE HEAT* are the most harmful to the US Populations and  
+These conclusions are based in the information in the database as of March 2017.
 
 # Data Processing
 ### Load necessary libraries
@@ -20,7 +25,7 @@ require(dplyr)
 require(lubridate)
 require(knitr)
 ```
-### Download and read the storm data into a data.frame
+### Download and read the storm data into a data.frame  
 ```{r cache=TRUE}
 if(!file.exists("StormData.csv.bz2")){
         download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2", "StormData.csv.bz2")
@@ -47,7 +52,8 @@ dfMaxFatalities <- dfEvent %>% group_by(YEAR) %>% filter(Total_FATALITIES == max
 ```{r}
 dfMaxInjuries <- dfEvent %>% group_by(YEAR) %>% filter(Total_INJURIES == max(Total_INJURIES)) %>% arrange(desc(YEAR),EVTYPE,Total_INJURIES)
 ```
-### The value of property damage are represented in the data is maintained in two fields  PROPDMG and PROPDMGEXP.  PROPDMGEXP is the exponent to be applied to the PROPDMG value. 
+### Calculating Total Property Damage for Each Event 
+The value of property damage are represented in the data is maintained in two fields  PROPDMG and PROPDMGEXP.  PROPDMGEXP is the exponent to be applied to the PROPDMG value. 
 The expected values for the exponent are:  
 1. b, B = Billions  
 2. m, M = Millions  
@@ -78,7 +84,8 @@ dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("K", "k"), 8] <-    dfEventDamage$
 dfEventDamage[dfEventDamage$PROPDMGEXP %in% c("H", "h"), 8] <-    dfEventDamage$PROPDMG[dfEventDamage$PROPDMGEXP %in% c('H', 'h')] * 10 ^ 2
 
 ```
-### The value of crop damage are represented in the data is maintained in two fields  CROPDMG and CROPDMGEXP.  CROPDMGEXP is the exponent to be applied to the CROPDMG value. 
+### Calcuating Total Crop Damage For Each Event
+The value of crop damage are represented in the data is maintained in two fields  CROPDMG and CROPDMGEXP.  CROPDMGEXP is the exponent to be applied to the CROPDMG value. 
 The expected values for the exponent are:  
 1. b, B = Billions  
 2. m, M = Millions  
@@ -116,16 +123,16 @@ names(dfEventDamage)<- c("YEAR", "EVTYPE", "Total_PropertyDamage", 'Total_CropDa
 ```
 ### Select the event type with the most property damage for a specific year
 ```{r}
-dfMaxPropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_PropertyDamage== max(Total_PropertyDamage)) %>% arrange(desc(YEAR),EVTYPE,Total_PropertyDamage)
+dfMaxPropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_PropertyDamage== max(Total_PropertyDamage) & Total_PropertyDamage > 0) %>% arrange(desc(YEAR),EVTYPE,Total_PropertyDamage)
 
-kable(dfMaxPropDamage[, c(1, 2, 3)], digits=2)
+kable(dfMaxPropDamage[, c(1, 2, 3)], format.args = list(digits = 2))
 ```
 
 ### Select the event type with the most Crop damage for a specific year
-```{r}
-dfMaxCropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_CropDamage== max(Total_CropDamage)) %>% arrange(desc(YEAR),EVTYPE,Total_CropDamage)
+```{r, results='asis'}
+dfMaxCropDamage <- dfEventDamage %>% group_by(YEAR) %>% filter( Total_CropDamage== max(Total_CropDamage) & Total_CropDamage > 0) %>% arrange(desc(YEAR),EVTYPE,Total_CropDamage)
 
-kable(dfMaxCropDamage[, c(1, 2, 4)], digits = 2)
+kable(dfMaxCropDamage[, c(1, 2, 4)], format.args = list(digits = 2))
 
 ```
 
@@ -134,14 +141,134 @@ kable(dfMaxCropDamage[, c(1, 2, 4)], digits = 2)
 #### Summary of event type count by year:
 
 * For the years 1950 - 1954, there is only 1 event type - Tornados
-* For the years 1955 - 1992, there are 3 event types
+* For the years 1955 - 1992, there are 3 event types - Tornados, Hail, Tsunami Wind
 * For the years 1993 - 2002, there are between 99 and 387 event types
 * For the years 2003 - 2011, there are between 38 and 51 event types  
 
 Given the change in event classificaitons, it will be difficult to compare data across these 4 periods.  For example, to more accurately compare across the last two periods of year listed above, some additional mapping of event types is necessary because the level of granularity in the classification for years 1993 - 2002 is much higher than for 2003 - 2011.  For the purpose of this initial analysis, this mapping is NOT present.
 
 ```{r}
-dfEventTypeCount
+plot(dfEventTypeCount$YEAR, dfEventTypeCount$NUM_EVTYPE, main="Event Classification Has Changed Significantly From 1950 to 2011", xlab="Year", ylab = "Number of Event Types")
+
+# Create Year Ranges representing these periods
+YearPeriod1 <- seq.int(1951, 1992, 1)
+YearPeriod2 <- seq.int(1993, 2002, 1)
+YearPeriod3 <- seq.int(2003, 2011, 1)
+```
+### Fatalities:
+#### For the most recent period 2003 - 2011  
+TORNADOS are the most fatal, followed by EXCESSIVE HEAT
+```{r}
+kable(dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod3, c(1,2,3)])
+
+dfSumFatalities3 <- dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod3, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_FATALITIES)) 
+names(dfSumFatalities3) <- c("EVTYPE", "SumTotal_FATALITIES")
+dfSumFatalities3 <- arrange(dfSumFatalities3, desc(SumTotal_FATALITIES))
+
+kable(dfSumFatalities3)
+```
+
+#### For the period 1993 - 2002
+EXCESSIVE HEAT / HEAT are the most fatal, followed by TORNADOS
+
+```{r}
+kable(dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod2, c(1,2,3)])
+
+dfSumFatalities2 <- dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod2, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_FATALITIES)) 
+names(dfSumFatalities2) <- c("EVTYPE", "SumTotal_FATALITIES")
+dfSumFatalities2 <- arrange(dfSumFatalities2, desc(SumTotal_FATALITIES))
+
+kable(dfSumFatalities2)
+```
+
+##### Tornados did not appear at the top, as a result of using a classificaiton system that has multi-event types for Tornado.
+Total Fatalities for all Event types that contain "tornado" case insensitive
+```{r}
+paste0("Total Tornado events for this period: ", as.character(sum(dfEvent$Total_FATALITIES[dfEvent$YEAR %in% YearPeriod2 & grepl("tornado", dfEvent$EVTYPE, ignore.case = TRUE)])))
+```
+
+#### For the period 1951 - 1992
+TORNADOS are the most fatal, followed by TSUNAMI WIND in 1986; however, there are only 3 event types for this period, Tornados, Hail, and Tsunami Wind
+
+```{r}
+kable(dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod1, c(1,2,3)])
+
+dfSumFatalities1 <- dfMaxFatalities[dfMaxFatalities$YEAR %in% YearPeriod1, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_FATALITIES)) 
+names(dfSumFatalities1) <- c("EVTYPE", "SumTotal_FATALITIES")
+dfSumFatalities1 <- arrange(dfSumFatalities1, desc(SumTotal_FATALITIES))
+
+kable(dfSumFatalities1)
+```
+
+### Injuries:
+#### For the most recent period 2003 - 2011  
+TORNADOS are the most injurous, followed by EXCESSIVE HEAT, then by HURRICANE/TYPHOON
+```{r}
+kable(dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod3, c(1,2,4)])
+
+dfSumInjuries3 <- dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod3, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_INJURIES)) 
+names(dfSumInjuries3) <- c("EVTYPE", "SumTotal_INJURIES")
+dfSumInjuries3 <- arrange(dfSumInjuries3, desc(SumTotal_INJURIES))
+
+kable(dfSumInjuries3)
+```
+
+#### For the period 1993 - 2002
+TORNADOS are the most injurious, followed by FLOODS and by ICE STORMS
+
+```{r}
+kable(dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod2, c(1,2,4)])
+
+dfSumInjuries2 <- dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod2, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_INJURIES)) 
+names(dfSumInjuries2) <- c("EVTYPE", "SumTotal_INJURIES")
+dfSumInjuries2 <- arrange(dfSumInjuries2, desc(SumTotal_INJURIES))
+
+kable(dfSumInjuries2)
+```
+
+##### Tornados did  appear at the top, but as a result of using a classificaiton system that has multi-event types for Tornado, not all injuries are represented above.
+Total Fatalities for all Event types that contain "tornado" case insensitive
+```{r}
+paste0("Total Tornado events for this period: ", as.character(sum(dfEvent$Total_INJURIES[dfEvent$YEAR %in% YearPeriod2 & grepl("tornado", dfEvent$EVTYPE, ignore.case = TRUE)])))
+```
+
+#### For the period 1951 - 1992
+TORNADOS are the most injurious; however, there are only 3 event types for this period, Tornados, Hail, and Tsunami Wind
+
+```{r}
+kable(dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod1, c(1,2,4)])
+
+dfSumInjuries1 <- dfMaxInjuries[dfMaxInjuries$YEAR %in% YearPeriod1, ] %>% group_by(EVTYPE) %>%  summarize(sum(Total_INJURIES)) 
+names(dfSumInjuries1) <- c("EVTYPE", "SumTotal_INJURIES")
+dfSumInjuries1 <- arrange(dfSumInjuries1, desc(SumTotal_INJURIES))
+
+kable(dfSumInjuries1)
 ```
 
 # Results
+#### Which Events are the Most Harmful with Respect to Population Health?
+With respect to Fatalities per year, *TORNADOS* and *EXCESSIVE HEAT* are the most harmful. With Tornados being the most harmful in recent years.   
+With respect to Injuries per year, *TORNADOS* are consistently the most harmful across all years.
+
+```{r}
+
+lstYearBeginRange <- c(range(YearPeriod3)[1], range(YearPeriod3)[1], range(YearPeriod2)[1], range(YearPeriod2)[1], range(YearPeriod1)[1])
+lstYearEndRange <- c(range(YearPeriod3)[2], range(YearPeriod3)[2], range(YearPeriod2)[2], range(YearPeriod2)[2], range(YearPeriod1)[2])
+
+lstFatalEvents <- c(as.character(dfSumFatalities3$EVTYPE[1]), as.character(dfSumFatalities3$EVTYPE[2]), as.character(dfSumFatalities2$EVTYPE[1]), "TORNADO", as.character(dfSumFatalities1$EVTYPE[1]))
+
+lstFatalities <-  c(dfSumFatalities3$SumTotal_FATALITIES[1]/length(YearPeriod3), dfSumFatalities3$SumTotal_FATALITIES[2]/length(YearPeriod3), dfSumFatalities2$SumTotal_FATALITIES[1]/length(YearPeriod2), sum(dfEvent$Total_FATALITIES[dfEvent$YEAR %in% YearPeriod2 & grepl("tornado", dfEvent$EVTYPE, ignore.case = TRUE)]) / length(YearPeriod2), dfSumFatalities1$SumTotal_FATALITIES[1]/length(YearPeriod1))
+
+dfFatalities <- data.frame(lstYearBeginRange, lstYearEndRange, lstFatalEvents, lstFatalities)
+names(dfFatalities) <- c('Period Start', 'Period End', 'Event Type', 'Fatalities Per Year')
+kable(dfFatalities, format.args = list(digits=0))
+
+lstInjuryEvents <- c(as.character(dfSumInjuries3$EVTYPE[1]), as.character(dfSumInjuries3$EVTYPE[2]), as.character(dfSumInjuries2$EVTYPE[1]), as.character(dfSumInjuries2$EVTYPE[2]), as.character(dfSumInjuries1$EVTYPE[1]))
+
+lstInjuries <-  c(dfSumInjuries3$SumTotal_INJURIES[1]/length(YearPeriod3), dfSumInjuries3$SumTotal_INJURIES[2]/length(YearPeriod3), sum(dfEvent$Total_INJURIES[dfEvent$YEAR %in% YearPeriod2 & grepl("tornado", dfEvent$EVTYPE, ignore.case = TRUE)]) / length(YearPeriod2), dfSumInjuries2$SumTotal_INJURIES[2]/length(YearPeriod2),  dfSumInjuries1$SumTotal_INJURIES[1]/length(YearPeriod1))
+
+dfInjuries <- data.frame(lstYearBeginRange, lstYearEndRange, lstInjuryEvents, lstInjuries)
+names(dfInjuries) <- c('Period Start', 'Period End', 'Event Type', 'Injuries Per Year')
+kable(dfInjuries, format.args = list(digits=0))
+
+```
